@@ -1,0 +1,221 @@
+<!DOCTYPE html>  <html lang="en">  
+<head>  
+  <meta charset="UTF-8">  
+  <title>Space Dodger</title>  
+  <style>  
+    html, body {  
+      margin: 0;  
+      padding: 0;  
+      background: black;  
+      overflow: hidden;  
+      touch-action: none;  
+    }  
+    canvas {  
+      display: block;  
+    }  
+  </style>  
+</head>  
+<body>  
+<canvas id="space"></canvas>  
+<script>  
+const canvas = document.getElementById("space");  
+const ctx = canvas.getContext("2d");  
+let w, h;  
+let shipX = 0, shipY = 0;  function resize() {
+w = canvas.width = window.innerWidth;
+h = canvas.height = window.innerHeight;
+shipX = w / 2;
+shipY = h * 0.85;
+}
+resize();
+window.addEventListener("resize", resize);
+
+// Управление
+let touchActive = false;
+let controlOffset = null;
+
+function isInShip(x, y) {
+const dx = x - shipX;
+const dy = y - shipY;
+return dx * dx + dy * dy <= 30 * 30;
+}
+
+function startControl(x, y) {
+if (isInShip(x, y)) {
+controlOffset = { dx: x - shipX, dy: y - shipY };
+touchActive = true;
+}
+}
+function endControl() {
+touchActive = false;
+controlOffset = null;
+}
+function moveControl(x, y) {
+if (touchActive && controlOffset) {
+shipX = x - controlOffset.dx;
+shipY = y - controlOffset.dy;
+}
+}
+
+canvas.addEventListener("touchstart", e => {
+const t = e.touches[0];
+startControl(t.clientX, t.clientY);
+});
+canvas.addEventListener("touchmove", e => {
+const t = e.touches[0];
+moveControl(t.clientX, t.clientY);
+}, { passive: false });
+canvas.addEventListener("touchend", endControl);
+
+canvas.addEventListener("mousedown", e => {
+startControl(e.clientX, e.clientY);
+});
+canvas.addEventListener("mousemove", e => {
+moveControl(e.clientX, e.clientY);
+});
+canvas.addEventListener("mouseup", endControl);
+
+// Звезды
+let stars = [];
+for (let i = 0; i < 100; i++) {
+stars.push({
+x: Math.random() * w,
+y: Math.random() * h,
+size: Math.random() * 2,
+speed: 0.2 + Math.random() * 0.5
+});
+}
+
+// Объекты
+let objects = [];
+let level = 1;
+let maxLevels = 100;
+let startTime = Date.now();
+let gameOver = false;
+let won = false;
+let lastLevel = 1;
+const levelTime = 10000;
+
+function createObject() {
+const colors = ["#a0f", "#ccc"];
+const color = colors[Math.floor(Math.random() * colors.length)];
+objects.push({
+x: Math.random() * w,
+y: -30,
+speed: 1 + level * 0.3 + Math.random() * 2,
+size: 20 + Math.random() * 20,
+color
+});
+}
+
+function drawObject(obj) {
+ctx.beginPath();
+ctx.fillStyle = obj.color;
+ctx.globalAlpha = Math.max(0.2, 1 - level / 100);
+ctx.shadowColor = obj.color;
+ctx.shadowBlur = 10;
+ctx.arc(obj.x, obj.y, obj.size, 0, Math.PI * 2);
+ctx.fill();
+ctx.shadowBlur = 0;
+ctx.globalAlpha = 1;
+}
+
+function drawStars() {
+ctx.fillStyle = "#000";
+ctx.fillRect(0, 0, w, h);
+for (let s of stars) {
+s.y += s.speed;
+if (s.y > h) {
+s.y = 0;
+s.x = Math.random() * w;
+}
+ctx.fillStyle = "white";
+ctx.fillRect(s.x, s.y, s.size, s.size);
+}
+}
+
+function drawShip() {
+ctx.save();
+ctx.translate(shipX, shipY);
+ctx.scale(1.5, 1.5);
+ctx.beginPath();
+ctx.moveTo(0, -12);
+ctx.lineTo(-10, 10);
+ctx.lineTo(0, 6);
+ctx.lineTo(10, 10);
+ctx.closePath();
+ctx.fillStyle = "#0ff";
+ctx.shadowColor = "#0ff";
+ctx.shadowBlur = 20;
+ctx.fill();
+ctx.shadowBlur = 0;
+
+ctx.beginPath();
+ctx.arc(0, -4, 3, 0, Math.PI * 2);
+ctx.fillStyle = "#fff";
+ctx.fill();
+ctx.restore();
+}
+
+function drawLevel() {
+ctx.fillStyle = "#0ff";
+ctx.font = "bold 40px monospace";
+ctx.textAlign = "center";
+ctx.fillText("LEVEL " + level, w / 2, 50);
+}
+
+function collision(obj) {
+const dx = obj.x - shipX;
+const dy = obj.y - shipY;
+return Math.sqrt(dx * dx + dy * dy) < obj.size + 15;
+}
+
+function end(text, color = "#f44") {
+ctx.fillStyle = "rgba(0,0,0,0.7)";
+ctx.fillRect(0, 0, w, h);
+ctx.fillStyle = color;
+ctx.font = "bold 36px sans-serif";
+ctx.textAlign = "center";
+ctx.fillText(text, w / 2, h / 2);
+}
+
+function animate() {
+if (gameOver) return end("Game Over");
+if (won) return end("You Win!", "#0f0");
+
+drawStars();
+
+if (Math.random() < 0.015 + level * 0.003) createObject();
+for (let i = objects.length - 1; i >= 0; i--) {
+let o = objects[i];
+o.y += o.speed;
+drawObject(o);
+if (collision(o)) {
+gameOver = true;
+return;
+}
+if (o.y - o.size > h) objects.splice(i, 1);
+}
+
+drawShip();
+drawLevel();
+
+const elapsed = Date.now() - startTime;
+if (elapsed > levelTime) {
+level++;
+startTime = Date.now();
+if (level > maxLevels) won = true;
+else if (level !== lastLevel) {
+if (navigator.vibrate) navigator.vibrate(100);
+lastLevel = level;
+}
+}
+
+requestAnimationFrame(animate);
+}
+animate();
+</script>
+
+</body>  
+</html>  Модалка с результатом после проигрыша и выигрыша, предложение сыграть еше
+
